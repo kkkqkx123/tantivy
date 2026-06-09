@@ -153,6 +153,7 @@ impl Scorer for TermScorer {
 mod tests {
     use proptest::prelude::*;
 
+    use crate::index::Bm25Params;
     use crate::index::SegmentId;
     use crate::indexer::index_writer::MEMORY_BUDGET_NUM_BYTES_MIN;
     use crate::merge_policy::NoMergePolicy;
@@ -166,7 +167,8 @@ mod tests {
 
     #[test]
     fn test_term_scorer_max_score() -> crate::Result<()> {
-        let bm25_weight = Bm25Weight::for_one_term(3, 6, 10.0);
+        let bm25_params = Bm25Params::default();
+        let bm25_weight = Bm25Weight::for_one_term(3, 6, 10.0, &bm25_params);
         let mut term_scorer = TermScorer::create_for_test(
             &[(2, 3), (3, 12), (7, 8)],
             &[0, 0, 10, 12, 0, 0, 0, 100],
@@ -192,7 +194,8 @@ mod tests {
 
     #[test]
     fn test_term_scorer_shallow_advance() -> crate::Result<()> {
-        let bm25_weight = Bm25Weight::for_one_term(300, 1024, 10.0);
+        let bm25_params = Bm25Params::default();
+        let bm25_weight = Bm25Weight::for_one_term(300, 1024, 10.0, &bm25_params);
         let mut doc_and_tfs = vec![];
         for i in 0u32..300u32 {
             let doc = i * 10;
@@ -210,7 +213,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_term_scorer_block_max_score(term_freqs_fieldnorms in proptest::collection::vec((1u32..10u32, 0u32..100u32), 80..300)) {
+    fn test_term_scorer_block_max_score(term_freqs_fieldnorms in proptest::collection::vec((1u32..10u32, 0u32..100u32), 80..300)) {
         let term_doc_freq = term_freqs_fieldnorms.len();
          let doc_tfs: Vec<(u32, u32)> = term_freqs_fieldnorms.iter()
                    .cloned()
@@ -230,9 +233,13 @@ mod tests {
              // Average fieldnorm is over the entire index,
              // not necessarily the docs that are in the posting list.
              // For this reason we multiply by 1.1 to make a realistic value.
-         let bm25_weight = Bm25Weight::for_one_term(term_doc_freq as u64,
+         let bm25_params = Bm25Params::default();
+         let bm25_weight = Bm25Weight::for_one_term(
+            term_doc_freq as u64,
             term_doc_freq as u64 * 10u64,
-            average_fieldnorm);
+            average_fieldnorm,
+            &bm25_params,
+        );
 
          let mut term_scorer =
               TermScorer::create_for_test(&doc_tfs[..], &fieldnorms[..], bm25_weight);
@@ -253,6 +260,7 @@ mod tests {
 
     #[test]
     fn test_block_wand() {
+        let bm25_params = Bm25Params::default();
         let mut doc_tfs: Vec<(u32, u32)> = vec![];
         for doc in 0u32..128u32 {
             doc_tfs.push((doc, 1u32));
@@ -265,7 +273,7 @@ mod tests {
         doc_tfs.push((258, 1u32));
 
         let fieldnorms: Vec<u32> = std::iter::repeat_n(20u32, 300).collect();
-        let bm25_weight = Bm25Weight::for_one_term(10, 129, 20.0);
+        let bm25_weight = Bm25Weight::for_one_term(10, 129, 20.0, &bm25_params);
         let mut docs = TermScorer::create_for_test(&doc_tfs[..], &fieldnorms[..], bm25_weight);
         assert_nearly_equals!(docs.block_max_score(), 2.5161593);
         docs.seek_block(135);

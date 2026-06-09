@@ -6,7 +6,7 @@ use common::{BinarySerializable, CountingWriter, VInt};
 use super::TermInfo;
 use crate::directory::{CompositeWrite, WritePtr};
 use crate::fieldnorm::FieldNormReader;
-use crate::index::Segment;
+use crate::index::{Bm25Params, Segment};
 use crate::positions::PositionSerializer;
 use crate::postings::compression::{BlockEncoder, VIntEncoder, COMPRESSION_BLOCK_SIZE};
 use crate::postings::skip::SkipSerializer;
@@ -51,6 +51,7 @@ pub struct InvertedIndexSerializer {
     postings_write: CompositeWrite<WritePtr>,
     positions_write: CompositeWrite<WritePtr>,
     schema: Schema,
+    bm25_params: Bm25Params,
 }
 
 impl InvertedIndexSerializer {
@@ -62,6 +63,7 @@ impl InvertedIndexSerializer {
             postings_write: CompositeWrite::wrap(segment.open_write(Postings)?),
             positions_write: CompositeWrite::wrap(segment.open_write(Positions)?),
             schema: segment.schema(),
+            bm25_params: segment.index().bm25_params().clone(),
         };
         Ok(inv_index_serializer)
     }
@@ -91,6 +93,7 @@ impl InvertedIndexSerializer {
             postings_write,
             positions_write,
             fieldnorm_reader,
+            self.bm25_params.clone(),
         )
     }
 
@@ -124,6 +127,7 @@ impl<'a, W: Write> FieldSerializer<'a, W> {
         postings_write: &'a mut CountingWriter<W>,
         positions_write: &'a mut CountingWriter<W>,
         fieldnorm_reader: Option<FieldNormReader>,
+        bm25_params: Bm25Params,
     ) -> io::Result<FieldSerializer<'a, W>> {
         total_num_tokens.serialize(postings_write)?;
         let term_dictionary_builder = TermDictionaryBuilder::create(term_dictionary_write)?;
@@ -132,7 +136,12 @@ impl<'a, W: Write> FieldSerializer<'a, W> {
             .map(|ff_reader| total_num_tokens as Score / ff_reader.num_docs() as Score)
             .unwrap_or(0.0);
         let postings_serializer =
-            PostingsSerializer::new(average_fieldnorm, index_record_option, fieldnorm_reader);
+            PostingsSerializer::new(
+                average_fieldnorm,
+                index_record_option,
+                fieldnorm_reader,
+                bm25_params,
+            );
         let positions_serializer_opt = if index_record_option.has_positions() {
             Some(PositionSerializer::new(positions_write))
         } else {
@@ -317,6 +326,7 @@ pub struct PostingsSerializer {
     fieldnorm_reader: Option<FieldNormReader>,
 
     bm25_weight: Option<Bm25Weight>,
+    bm25_params: Bm25Params,
     avg_fieldnorm: Score, /* Average number of term in the field for that segment.
                            * this value is used to compute the block wand information. */
     term_has_freq: bool,
@@ -330,6 +340,7 @@ impl PostingsSerializer {
         avg_fieldnorm: Score,
         mode: IndexRecordOption,
         fieldnorm_reader: Option<FieldNormReader>,
+        bm25_params: Bm25Params,
     ) -> PostingsSerializer {
         PostingsSerializer {
             block_encoder: BlockEncoder::new(),
@@ -343,6 +354,7 @@ impl PostingsSerializer {
 
             fieldnorm_reader,
             bm25_weight: None,
+            bm25_params,
             avg_fieldnorm,
             term_has_freq: false,
         }
@@ -373,6 +385,7 @@ impl PostingsSerializer {
             term_doc_freq as u64,
             num_docs_in_segment,
             self.avg_fieldnorm,
+            &self.bm25_params,
         ));
     }
 
