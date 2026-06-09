@@ -1,34 +1,34 @@
-# GraphDB Tantivy 分支补充说明
+# GraphDB Tantivy Branch Supplementary Notes
 
-这个分支只新增一项面向 GraphDB 的能力：**可配置的 BM25 参数**。
+This branch adds only one capability for GraphDB: **configurable BM25 parameters**.
 
-## 新增内容
+## New Content
 
 ### `Bm25Params`
 
-新增 `Bm25Params` 结构体，用于配置每个索引的 BM25 参数：
+A new `Bm25Params` struct is added to configure the BM25 parameters for each index:
 
-- `k1`: 词频饱和参数
-- `b`: 文档长度归一化参数
+- `k1`: Term frequency saturation parameter
+- `b`: Document length normalization parameter
 
-默认值保持不变：
+Default values remain unchanged:
 
 - `k1 = 1.2`
 - `b = 0.75`
 
 ### `IndexSettings::bm25_params`
 
-在 `IndexSettings` 中新增可选字段：
+An optional field is added to `IndexSettings`:
 
 - `bm25_params: Option<Bm25Params>`
 
-如果不显式设置，行为与上游完全一致，仍然使用默认 BM25 参数。
+If not explicitly set, behavior remains identical to upstream, still using the default BM25 parameters.
 
-### 序列化兼容
+### Serialization Compatibility
 
-`bm25_params` 会写入 `meta.json`，但旧索引文件在缺少该字段时仍可正常读取。
+`bm25_params` will be written to `meta.json`, but old index files missing this field can still be read normally.
 
-## 使用示例
+## Usage Example
 
 ```rust
 use tantivy::index::Bm25Params;
@@ -45,7 +45,7 @@ assert_eq!(params.k1, 1.5);
 assert_eq!(params.b, 0.6);
 ```
 
-## 说明
+## Notes
 
-- 这份分支文档只描述本分支新增的功能，不重复上游已有内容。
-- 如果不使用 `bm25_params`，这份分支与上游的搜索行为保持一致。
+- This branch documentation describes only the features added by this branch and does not repeat content already present in upstream.
+- If `bm25_params` is not used, this branch maintains search behavior consistent with upstream.
