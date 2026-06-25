@@ -377,7 +377,22 @@ impl IntermediateMetricResult {
                 MetricResult::ExtendedStats(intermediate_stats.finalize())
             }
             IntermediateMetricResult::Sum(intermediate_sum) => {
-                MetricResult::Sum(intermediate_sum.finalize().into())
+                // By default match Elasticsearch: empty / all-missing sum
+                // buckets serialize as `"value": 0`, not `"value": null`.
+                // The non-ES `none_if_no_match` flag on `SumAggregation`
+                // opts into SQL-style `null` for downstream consumers.
+                let none_if_no_match = req
+                    .agg
+                    .as_sum()
+                    .and_then(|sum| sum.none_if_no_match)
+                    .unwrap_or(false);
+                let value = intermediate_sum.finalize();
+                if none_if_no_match {
+                    MetricResult::Sum(value.into())
+                } else {
+                    let value = Some(value.unwrap_or(0.0));
+                    MetricResult::Sum(value.into())
+                }
             }
             IntermediateMetricResult::Percentiles(percentiles) => MetricResult::Percentiles(
                 percentiles
@@ -915,7 +930,7 @@ impl IntermediateRangeBucketEntry {
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct IntermediateTermBucketEntry {
     /// The number of documents in the bucket.
-    pub doc_count: u32,
+    pub doc_count: u64,
     /// The sub_aggregation in this bucket.
     pub sub_aggregation: IntermediateAggregationResults,
 }
@@ -1223,6 +1238,24 @@ mod tests {
         ]);
 
         assert_eq!(tree_left, tree_expected);
+    }
+
+    #[test]
+    fn test_term_bucket_doc_count_no_u32_overflow() {
+        // Two segments each contributing (u32::MAX - 100) docs to the same term. Summing them
+        // overflowed when doc_count was u32.
+        let per_segment = u32::MAX as u64 - 100;
+        let mut entry = IntermediateTermBucketEntry {
+            doc_count: per_segment,
+            sub_aggregation: Default::default(),
+        };
+        entry
+            .merge_fruits(IntermediateTermBucketEntry {
+                doc_count: per_segment,
+                sub_aggregation: Default::default(),
+            })
+            .unwrap();
+        assert_eq!(entry.doc_count, per_segment * 2);
     }
 
     #[test]
