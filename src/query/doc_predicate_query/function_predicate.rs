@@ -1,5 +1,7 @@
 use super::{DocPredicate, SegmentDocPredicate};
 use crate::index::SegmentReader;
+use crate::query::doc_predicate_query::ConstOrVariableSegmentPredicate;
+use crate::query::AllScorer;
 use crate::DocId;
 
 /// Blanket [`SegmentDocPredicate`] implementation for any per-document
@@ -48,8 +50,15 @@ where
 {
     type SegmentDocPredicate = SegmentF;
 
-    fn doc_predicate(&self, segment_reader: &SegmentReader) -> crate::Result<SegmentF> {
-        (self.segment_predicate_factory)(segment_reader)
+    fn doc_predicate(
+        &self,
+        segment_reader: &SegmentReader,
+    ) -> crate::Result<ConstOrVariableSegmentPredicate<SegmentF>> {
+        let predicate = (self.segment_predicate_factory)(segment_reader)?;
+        Ok(ConstOrVariableSegmentPredicate::Variable {
+            predicate,
+            necessary_condition: Box::new(AllScorer::new(segment_reader.max_doc())),
+        })
     }
 }
 
@@ -65,7 +74,7 @@ mod tests {
         let index = create_index_for_test(4);
         let searcher = index.reader().unwrap().searcher();
         let predicate = FunctionPredicate::from(|_segment_reader: &SegmentReader| {
-            Ok(move |doc_id: DocId| doc_id % 2 == 0)
+            Ok(move |doc_id: DocId| doc_id.is_multiple_of(2))
         });
         let query: DocPredicateQuery = predicate.into();
         assert_eq!(searcher.search(&query, &Count).unwrap(), 2);
