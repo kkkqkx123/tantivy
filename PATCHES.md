@@ -1,6 +1,6 @@
-# GraphDB Tantivy Branch Supplementary Notes
+# Tantivy Branch Supplementary Notes
 
-This branch adds only one capability for linkrs: **configurable BM25 parameters**.
+This branch adds only one capability for downstream consumers: **configurable BM25 parameters**.
 
 ## New Content
 
