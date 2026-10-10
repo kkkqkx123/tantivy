@@ -198,23 +198,28 @@ pub enum StatsType {
 }
 
 fn create_collector<const TYPE_ID: u8>(
-    req: &MetricAggReqData,
+    req: MetricAggReqData,
 ) -> Box<dyn SegmentAggregationCollector> {
+    let column_opt = req
+        .accessor
+        .as_column()
+        .map(|column| (column.clone(), req.accessor.column_type()));
     Box::new(SegmentStatsCollector::<TYPE_ID> {
-        name: req.name.clone(),
+        name: req.name,
         collecting_for: req.collecting_for,
         is_number_or_date_type: req.is_number_or_date_type,
         missing_u64: req.missing_u64,
-        accessor: req.accessor.clone(),
+        column_opt,
+        accessor: req.accessor,
         buckets: vec![IntermediateStats::default()],
     })
 }
 
 /// Build a concrete `SegmentStatsCollector` depending on the column type.
 pub(crate) fn build_segment_stats_collector(
-    req: &MetricAggReqData,
+    req: MetricAggReqData,
 ) -> crate::Result<Box<dyn SegmentAggregationCollector>> {
-    match req.field_type {
+    match req.accessor.column_type() {
         ColumnType::I64 => Ok(create_collector::<{ ColumnType::I64 as u8 }>(req)),
         ColumnType::U64 => Ok(create_collector::<{ ColumnType::U64 as u8 }>(req)),
         ColumnType::F64 => Ok(create_collector::<{ ColumnType::F64 as u8 }>(req)),
@@ -227,10 +232,16 @@ pub(crate) fn build_segment_stats_collector(
 }
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct SegmentStatsCollector<const COLUMN_TYPE_ID: u8> {
     pub(crate) missing_u64: Option<u64>,
-    pub(crate) accessor: Column<u64>,
+    pub(crate) accessor: Box<dyn ValueSource>,
+    /// The physical column backing `accessor`, if any, resolved once at construction.
+    ///
+    /// `collect` is called once per bucket, often with a single doc (e.g. under a
+    /// high-cardinality terms agg), so a per-call virtual dispatch through `accessor` is
+    /// measurable.
+    pub(crate) column_opt: Option<(Column<u64>, ColumnType)>,
     pub(crate) is_number_or_date_type: bool,
     pub(crate) buckets: Vec<IntermediateStats>,
     pub(crate) name: String,
@@ -290,21 +301,31 @@ impl<const COLUMN_TYPE_ID: u8> SegmentAggregationCollector
         // skips the block accessor's buffers entirely.
         // Only valid without a missing value: `values_for_doc` yields nothing for a doc without a
         // value, so the substitute would be silently dropped.
+        // Also only valid over a materialized column: `values_for_doc` is per-document random
+        // access, which a computed source cannot offer. Those fall through to the block path
+        // below, which is semantically identical.
         // TODO: remove once we fetch all values for all bucket ids in one go
-        if docs.len() == 1 && self.missing_u64.is_none() {
-            collect_stats::<COLUMN_TYPE_ID>(
-                &mut self.buckets[parent_bucket_id as usize],
-                self.accessor.values_for_doc(docs[0]),
-                self.is_number_or_date_type,
-            )?;
-
-            return Ok(());
+        if let Some(column_source) = &mut self.column_opt {
+            if docs.len() == 1 && self.missing_u64.is_none() {
+                collect_stats::<COLUMN_TYPE_ID>(
+                    &mut self.buckets[parent_bucket_id as usize],
+                    column_source.0.values_for_doc(docs[0]),
+                    self.is_number_or_date_type,
+                )?;
+                return Ok(());
+            }
+            agg_data.column_block_accessor.fetch_block_with_missing(
+                docs,
+                column_source,
+                self.missing_u64,
+            );
+        } else {
+            agg_data.column_block_accessor.fetch_block_with_missing(
+                docs,
+                &mut *self.accessor,
+                self.missing_u64,
+            );
         }
-        agg_data.column_block_accessor.fetch_block_with_missing(
-            docs,
-            &self.accessor,
-            self.missing_u64,
-        );
         collect_stats::<COLUMN_TYPE_ID>(
             &mut self.buckets[parent_bucket_id as usize],
             agg_data.column_block_accessor.iter_vals(),

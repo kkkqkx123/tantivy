@@ -11,12 +11,12 @@
 use std::fmt::Debug;
 use std::io;
 
-use columnar::{Column, ColumnType, Dictionary};
+use columnar::ColumnType;
 use datasketches::hll::Coupon;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use super::term_ord_accumulator::TermOrdAccumulator;
-use super::CardinalityCollector;
+use super::{CardinalityAggReqData, CardinalityCollector};
 use crate::aggregation::agg_data::AggregationsSegmentCtx;
 use crate::aggregation::intermediate_agg_result::{
     IntermediateAggregationResult, IntermediateAggregationResults, IntermediateMetricResult,
@@ -97,11 +97,8 @@ pub(crate) struct SegmentStrCardinalityCollector<S: TermOrdAccumulator> {
     /// Buckets are Some(_) until they get consumed by
     /// `add_intermediate_aggregation_result`.
     buckets: Vec<Option<S>>,
-    accessor_idx: usize,
-    /// The column accessor to access the fast field values (term ordinals).
-    accessor: Column<u64>,
-    /// The missing value normalized to the internal u64 representation of the field type.
-    missing_value_for_accessor: Option<u64>,
+    /// The request data. Its accessor gives access to the term ordinals.
+    req_data: CardinalityAggReqData,
     /// Lazily built at finalization time, shared by every bucket.
     coupon_cache: Option<CouponCache>,
     /// Largest term_ord that may be inserted into a bucket, i.e.
@@ -115,7 +112,7 @@ impl<S: TermOrdAccumulator> Debug for SegmentStrCardinalityCollector<S> {
             .field("num_buckets", &self.buckets.len())
             .field(
                 "missing_value_for_accessor",
-                &self.missing_value_for_accessor,
+                &self.req_data.missing_value_for_accessor,
             )
             .finish()
     }
@@ -125,7 +122,7 @@ impl<S: TermOrdAccumulator> Debug for SegmentStrCardinalityCollector<S> {
 /// Returns a mapping from term_ord to the hash (coupon) of the associated term.
 fn build_coupon_cache<S: TermOrdAccumulator>(
     buckets: &[Option<S>],
-    dictionary: &Dictionary,
+    dictionary: &dyn ValueSourceDictionary,
     missing_value_opt: Option<&Key>,
 ) -> io::Result<CouponCache> {
     // Pass 1 computes the capacity hint, pass 2 inserts.
@@ -140,11 +137,11 @@ fn build_coupon_cache<S: TermOrdAccumulator>(
     let mut term_ords: Vec<u64> = term_ords_set.into_iter().collect();
     term_ords.sort_unstable();
 
-    term_ords.pop_if(|highest_term_ord| *highest_term_ord >= dictionary.num_terms() as u64);
+    term_ords.pop_if(|highest_term_ord| *highest_term_ord >= dictionary.num_terms());
 
     let mut coupons: Vec<Coupon> = Vec::with_capacity(term_ords.len());
     let all_term_ords_found: bool =
-        dictionary.sorted_ords_to_term_cb(&term_ords, |term_bytes| {
+        dictionary.sorted_ords_to_term_cb(&term_ords, &mut |term_bytes| {
             let coupon: Coupon = Coupon::from_value(term_bytes);
             coupons.push(coupon);
         })?;
@@ -207,17 +204,10 @@ fn append_to_sketch(
 }
 
 impl<S: TermOrdAccumulator> SegmentStrCardinalityCollector<S> {
-    pub fn from_req(
-        accessor_idx: usize,
-        accessor: Column<u64>,
-        missing_value_for_accessor: Option<u64>,
-        max_term_ord_inclusive: u64,
-    ) -> Self {
+    pub(crate) fn from_req(req_data: CardinalityAggReqData, max_term_ord_inclusive: u64) -> Self {
         Self {
             buckets: Vec::new(),
-            accessor_idx,
-            accessor,
-            missing_value_for_accessor,
+            req_data,
             coupon_cache: None,
             max_term_ord_inclusive,
         }
@@ -234,10 +224,11 @@ impl<S: TermOrdAccumulator + 'static> SegmentAggregationCollector
         bucket_id: BucketId,
     ) -> crate::Result<()> {
         self.prepare_max_bucket(bucket_id, agg_data)?;
-        let req_data = &agg_data.get_cardinality_req_data(self.accessor_idx);
-        let Some(str_dict_column) = &req_data.str_dict_column else {
+        let req_data = &self.req_data;
+        // `ValueSource::term_dictionary` guarantees a dictionary for every `Str` source.
+        let Some(term_dictionary) = req_data.accessor.term_dictionary() else {
             return Err(crate::TantivyError::InternalError(
-                "a str cardinality collector requires a str dictionary column".to_string(),
+                "a `Str` value source must provide a term dictionary".to_string(),
             ));
         };
         // Strings are dictionary encoded. Fetching the terms associated to strings
@@ -249,7 +240,7 @@ impl<S: TermOrdAccumulator + 'static> SegmentAggregationCollector
         if self.coupon_cache.is_none() {
             self.coupon_cache = Some(build_coupon_cache(
                 &self.buckets,
-                str_dict_column.dictionary(),
+                term_dictionary,
                 req_data.req.missing.as_ref(),
             )?);
         }
@@ -282,8 +273,8 @@ impl<S: TermOrdAccumulator + 'static> SegmentAggregationCollector
     ) -> crate::Result<()> {
         agg_data.column_block_accessor.fetch_block_with_missing(
             docs,
-            &self.accessor,
-            self.missing_value_for_accessor,
+            &mut *self.req_data.accessor,
+            self.req_data.missing_value_for_accessor,
         );
         let Some(term_ords) = self.buckets[parent_bucket_id as usize].as_mut() else {
             return Err(crate::TantivyError::InternalError(
@@ -320,10 +311,9 @@ impl<S: TermOrdAccumulator + 'static> SegmentAggregationCollector
         bucket_id: BucketId,
         sub_agg_name: &str,
         sub_agg_property: &str,
-        agg_data: &AggregationsSegmentCtx,
+        _agg_data: &AggregationsSegmentCtx,
     ) -> Option<f64> {
-        let req_data = &agg_data.get_cardinality_req_data(self.accessor_idx);
-        if req_data.name != sub_agg_name || !sub_agg_property.is_empty() {
+        if self.req_data.name != sub_agg_name || !sub_agg_property.is_empty() {
             return None;
         }
         // The sketch isn't built until finalization; the term_ord set's len is

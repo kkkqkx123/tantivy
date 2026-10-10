@@ -17,7 +17,7 @@ mod term_ord_accumulator;
 
 use std::hash::Hash;
 
-use columnar::{Column, ColumnType, StrColumn};
+use columnar::ColumnType;
 use common::BitSet;
 use datasketches::hll::{Coupon, HllSketch, HllType, HllUnion};
 pub(crate) use numeric_collector::SegmentNumericCardinalityCollector;
@@ -25,8 +25,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub(crate) use str_collector::SegmentStrCardinalityCollector;
 pub(crate) use term_ord_accumulator::{TermOrdSet, BITSET_MAX_TERM_ORD};
 
-use crate::aggregation::agg_data::{AggRefNode, AggregationsSegmentCtx};
 use crate::aggregation::segment_agg_result::SegmentAggregationCollector;
+use crate::aggregation::value_source::ValueSource;
 use crate::aggregation::*;
 
 /// Log2 of the number of registers for the HLL sketch.
@@ -100,11 +100,7 @@ pub struct CardinalityAggregationReq {
 /// cardinality aggregation on a segment.
 pub(crate) struct CardinalityAggReqData {
     /// The column accessor to access the fast field values.
-    pub(crate) accessor: Column<u64>,
-    /// The column_type of the field.
-    pub(crate) column_type: ColumnType,
-    /// The string dictionary column if the field is of type string.
-    pub(crate) str_dict_column: Option<StrColumn>,
+    pub(crate) accessor: Box<dyn ValueSource>,
     /// The missing value normalized to the internal u64 representation of the field type.
     pub(crate) missing_value_for_accessor: Option<u64>,
     /// The name of the aggregation.
@@ -220,43 +216,47 @@ impl CardinalityCollector {
 /// finalization, non-str feeds the HLL sketch directly. Both produce the same
 /// [`IntermediateMetricResult::Cardinality`], so they merge uniformly.
 pub(crate) fn build_segment_cardinality_collector(
-    req: &mut AggregationsSegmentCtx,
-    node: &AggRefNode,
+    req_data: CardinalityAggReqData,
 ) -> crate::Result<Box<dyn SegmentAggregationCollector>> {
-    let req_data = req.get_cardinality_req_data(node.idx_in_req_data);
-    if req_data.column_type != ColumnType::Str {
+    if req_data.accessor.column_type() != ColumnType::Str {
         return Ok(Box::new(SegmentNumericCardinalityCollector::from_req(
-            req_data.column_type,
-            node.idx_in_req_data,
-            req_data.accessor.clone(),
-            req_data.missing_value_for_accessor,
+            req_data,
         )?));
     }
     // For str columns, we need to collect the set of term ordinals encounterred.
+    //
+    //
+    // In the case of physical columns, the dictionary is known so we have an upperbound
+    // of the term ord that will be encounterred.
+    //
     // We choose a different representation depending on the number of maximum
     // number of terms.
     //   * small (< BITSET_MAX_TERM_ORD): `BitSet`, pre-allocated.
     //   * large: `TermOrdSet` (sparse HashSet that promotes to a paged bitset).
-    let max_term_ord_inclusive = req_data.accessor.max_value();
-    if max_term_ord_inclusive < BITSET_MAX_TERM_ORD {
-        Ok(Box::new(
-            SegmentStrCardinalityCollector::<BitSet>::from_req(
-                node.idx_in_req_data,
-                req_data.accessor.clone(),
-                req_data.missing_value_for_accessor,
+    Ok(if let Some(column) = req_data.accessor.as_column() {
+        let max_term_ord_inclusive = column.max_value();
+        if max_term_ord_inclusive < BITSET_MAX_TERM_ORD {
+            Box::new(SegmentStrCardinalityCollector::<BitSet>::from_req(
+                req_data,
                 max_term_ord_inclusive,
-            ),
-        ))
+            ))
+        } else {
+            Box::new(SegmentStrCardinalityCollector::<TermOrdSet>::from_req(
+                req_data,
+                max_term_ord_inclusive,
+            ))
+        }
     } else {
-        Ok(Box::new(
-            SegmentStrCardinalityCollector::<TermOrdSet>::from_req(
-                node.idx_in_req_data,
-                req_data.accessor.clone(),
-                req_data.missing_value_for_accessor,
-                max_term_ord_inclusive,
-            ),
+        // For the moment, for non physical str column, we rely on the regular
+        // term ord set.
+        // TODO fix me! Although we do not have control over this, these values are likely
+        // created using a inc counter, with their unicity given by a hashmap already.
+        // We probably do not need another HashSet.
+        Box::new(SegmentStrCardinalityCollector::<TermOrdSet>::from_req(
+            req_data,
+            u64::MAX,
         ))
-    }
+    })
 }
 
 #[cfg(test)]

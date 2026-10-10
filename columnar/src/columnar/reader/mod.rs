@@ -218,7 +218,7 @@ impl ColumnarReader {
 mod tests {
     use common::json_path_writer::JSON_PATH_SEGMENT_SEP;
 
-    use crate::{ColumnType, ColumnarReader, ColumnarWriter};
+    use crate::{ColumnType, ColumnarReader, ColumnarWriter, DynamicColumn};
 
     #[test]
     fn test_list_columns() {
@@ -234,6 +234,25 @@ mod tests {
         assert_eq!(columns[0].1.column_type(), ColumnType::Str);
         assert_eq!(&columns[1].0, "col2");
         assert_eq!(columns[1].1.column_type(), ColumnType::U64);
+    }
+
+    #[test]
+    fn test_generated_tie_breaker_column() {
+        let mut columnar_writer = ColumnarWriter::default();
+        columnar_writer.record_tie_breaker_column("tie");
+        let mut buffer = Vec::new();
+        columnar_writer.serialize(1_025, None, &mut buffer).unwrap();
+
+        let columnar = ColumnarReader::open(buffer).unwrap();
+        let handles = columnar.read_columns("tie").unwrap();
+        assert_eq!(handles[0].column_type, ColumnType::I64);
+        let DynamicColumn::I64(column) = handles[0].open().unwrap() else {
+            panic!("expected an i64 tie-breaker column");
+        };
+        assert_eq!(column.index.get_cardinality(), crate::Cardinality::Full);
+        for doc in 1..1_025 {
+            assert_eq!(column.first(doc), Some(column.first(doc - 1).unwrap() + 1));
+        }
     }
 
     #[test]

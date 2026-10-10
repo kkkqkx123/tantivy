@@ -170,7 +170,7 @@ mod future_result;
 
 // Re-exports
 pub use columnar;
-pub use common::{ByteCount, DateTime};
+pub use common::{BitSet, ByteCount, DateTime};
 pub use query_grammar;
 pub use time;
 
@@ -225,7 +225,7 @@ pub use jitexpr;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-pub use self::docset::{DocSet, COLLECT_BLOCK_BUFFER_LEN, TERMINATED};
+pub use self::docset::{DocSet, SeekDangerResult, COLLECT_BLOCK_BUFFER_LEN, TERMINATED};
 pub use crate::core::{json_utils, Executor, Searcher, SearcherGeneration};
 pub use crate::directory::Directory;
 pub use crate::index::{

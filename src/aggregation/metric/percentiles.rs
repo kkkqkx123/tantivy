@@ -130,16 +130,15 @@ impl PercentilesAggregationReq {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct SegmentPercentilesCollector {
     pub(crate) buckets: Vec<PercentilesCollector>,
-    pub(crate) accessor_idx: usize,
-    /// The type of the field.
-    pub field_type: ColumnType,
+    /// The name of the aggregation.
+    pub(crate) name: String,
     /// The missing value normalized to the internal u64 representation of the field type.
     pub missing_u64: Option<u64>,
     /// The column accessor to access the fast field values.
-    pub(crate) accessor: Column<u64>,
+    pub(crate) accessor: Box<dyn ValueSource>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -249,18 +248,12 @@ impl PercentilesCollector {
 }
 
 impl SegmentPercentilesCollector {
-    pub fn from_req_and_validate(
-        field_type: ColumnType,
-        missing_u64: Option<u64>,
-        accessor: Column<u64>,
-        accessor_idx: usize,
-    ) -> Self {
+    pub(crate) fn from_req_and_validate(req_data: MetricAggReqData) -> Self {
         Self {
             buckets: Vec::with_capacity(64),
-            field_type,
-            missing_u64,
-            accessor,
-            accessor_idx,
+            name: req_data.name,
+            missing_u64: req_data.missing_u64,
+            accessor: req_data.accessor,
         }
     }
 }
@@ -273,7 +266,7 @@ impl SegmentAggregationCollector for SegmentPercentilesCollector {
         results: &mut IntermediateAggregationResults,
         parent_bucket_id: BucketId,
     ) -> crate::Result<()> {
-        let name = agg_data.get_metric_req_data(self.accessor_idx).name.clone();
+        let name = self.name.clone();
         self.prepare_max_bucket(parent_bucket_id, agg_data)?;
         // Swap collector with an empty one to avoid cloning
         let percentiles_collector = std::mem::take(&mut self.buckets[parent_bucket_id as usize]);
@@ -299,12 +292,13 @@ impl SegmentAggregationCollector for SegmentPercentilesCollector {
         let percentiles = &mut self.buckets[parent_bucket_id as usize];
         agg_data.column_block_accessor.fetch_block_with_missing(
             docs,
-            &self.accessor,
+            &mut *self.accessor,
             self.missing_u64,
         );
 
+        let field_type = self.accessor.column_type();
         for val in agg_data.column_block_accessor.iter_vals() {
-            let val1 = f64_from_fastfield_u64(val, self.field_type);
+            let val1 = f64_from_fastfield_u64(val, field_type);
             percentiles.collect(val1);
         }
 
@@ -327,9 +321,9 @@ impl SegmentAggregationCollector for SegmentPercentilesCollector {
         bucket_id: BucketId,
         sub_agg_name: &str,
         sub_agg_property: &str,
-        agg_data: &AggregationsSegmentCtx,
+        _agg_data: &AggregationsSegmentCtx,
     ) -> Option<f64> {
-        if agg_data.get_metric_req_data(self.accessor_idx).name != sub_agg_name {
+        if self.name != sub_agg_name {
             return None;
         }
         let percentile: f64 = sub_agg_property.parse().ok()?;

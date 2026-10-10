@@ -190,6 +190,10 @@ pub enum FieldType {
     Str(TextOptions),
     /// Unsigned 64-bits integers field type configuration
     U64(NumericOptions),
+    /// Generated tie-breaker field, exposed as an `i64` fast field.
+    ///
+    /// Values are almost always distinct, but not guaranteed to be unique across segments.
+    TieBreaker,
     /// Signed 64-bits integers 64 field type configuration
     I64(NumericOptions),
     /// 64-bits float 64 field type configuration
@@ -218,7 +222,7 @@ impl FieldType {
         match *self {
             FieldType::Str(_) => Type::Str,
             FieldType::U64(_) => Type::U64,
-            FieldType::I64(_) => Type::I64,
+            FieldType::I64(_) | FieldType::TieBreaker => Type::I64,
             FieldType::F64(_) => Type::F64,
             FieldType::Bool(_) => Type::Bool,
             FieldType::Date(_) => Type::Date,
@@ -273,7 +277,7 @@ impl FieldType {
             FieldType::Bytes(ref bytes_options) => bytes_options.is_indexed(),
             FieldType::JsonObject(ref json_object_options) => json_object_options.is_indexed(),
             FieldType::IpAddr(ref ip_addr_options) => ip_addr_options.is_indexed(),
-            FieldType::Custom(_) => false,
+            FieldType::TieBreaker | FieldType::Custom(_) => false,
         }
     }
 
@@ -311,6 +315,7 @@ impl FieldType {
             FieldType::IpAddr(ref ip_addr_options) => ip_addr_options.is_fast(),
             FieldType::Facet(_) => true,
             FieldType::JsonObject(ref json_object_options) => json_object_options.is_fast(),
+            FieldType::TieBreaker => true,
             FieldType::Custom(_) => false,
         }
     }
@@ -331,7 +336,7 @@ impl FieldType {
             FieldType::Bytes(ref bytes_options) => bytes_options.fieldnorms(),
             FieldType::JsonObject(ref _json_object_options) => false,
             FieldType::IpAddr(ref ip_addr_options) => ip_addr_options.fieldnorms(),
-            FieldType::Custom(_) => false,
+            FieldType::TieBreaker | FieldType::Custom(_) => false,
         }
     }
 
@@ -383,7 +388,7 @@ impl FieldType {
                     None
                 }
             }
-            FieldType::Custom(_) => None,
+            FieldType::TieBreaker | FieldType::Custom(_) => None,
         }
     }
 
@@ -486,6 +491,10 @@ impl FieldType {
 
                     Ok(OwnedValue::IpAddr(ip_addr.into_ipv6_addr()))
                 }
+                FieldType::TieBreaker => Err(ValueParsingError::TypeError {
+                    expected: "a generated tie-breaker field",
+                    json: JsonValue::String(field_text),
+                }),
                 FieldType::Custom(_) => Err(custom_not_json_error(JsonValue::String(field_text))),
             },
             JsonValue::Number(field_val_num) => match self {
@@ -543,6 +552,10 @@ impl FieldType {
                 }),
                 FieldType::IpAddr(_) => Err(ValueParsingError::TypeError {
                     expected: "a string with an ip addr",
+                    json: JsonValue::Number(field_val_num),
+                }),
+                FieldType::TieBreaker => Err(ValueParsingError::TypeError {
+                    expected: "a generated tie-breaker field",
                     json: JsonValue::Number(field_val_num),
                 }),
                 FieldType::Custom(_) => {

@@ -23,6 +23,19 @@ impl BucketIdProvider {
 }
 
 /// A SegmentAggregationCollector is used to collect aggregation results.
+///
+/// # Document ordering
+///
+/// For each bucket, submitted document IDs must be strictly increasing across all
+/// calls to [`Self::collect`] and [`Self::collect_multiple`]. A document may be
+/// submitted to different buckets, but only once to any given bucket. Submissions
+/// to different buckets do not need to be ordered relative to each other.
+///
+/// Bucket collectors may buffer submissions across calls and combine them into
+/// one child collector call without sorting or deduplicating. Downstream value
+/// loading requires ascending, duplicate-free document IDs for contiguous-range
+/// decoding and ordered missing-value handling. Ordering only within each call
+/// is therefore insufficient.
 pub trait SegmentAggregationCollector: Debug {
     fn add_intermediate_aggregation_result(
         &mut self,
@@ -31,7 +44,14 @@ pub trait SegmentAggregationCollector: Debug {
         parent_bucket_id: BucketId,
     ) -> crate::Result<()>;
 
-    /// Note: The caller needs to call `prepare_max_bucket` before calling `collect`.
+    /// Collect docs for one bucket.
+    ///
+    /// `docs` must be strictly increasing. Its first document ID, if any, must be
+    /// greater than every document ID previously submitted to `parent_bucket_id`
+    /// through either collection method. See the trait's document ordering contract.
+    ///
+    /// The caller must call `prepare_max_bucket` for at least `parent_bucket_id`
+    /// before collecting.
     fn collect(
         &mut self,
         parent_bucket_id: BucketId,
@@ -42,7 +62,15 @@ pub trait SegmentAggregationCollector: Debug {
     /// Collect docs for multiple buckets in one call.
     /// Minimizes dynamic dispatch overhead when collecting many buckets.
     ///
-    /// Note: The caller needs to call `prepare_max_bucket` before calling `collect`.
+    /// `bucket_ids` and `docs` must have equal lengths; each aligned pair is one
+    /// submission. For each bucket ID, document IDs must be strictly increasing
+    /// in submission order, including across nonconsecutive runs and previous
+    /// calls to either collection method. A document may appear for different
+    /// buckets; no ordering is required between different buckets. See the trait's
+    /// document ordering contract.
+    ///
+    /// The caller must call `prepare_max_bucket` for at least the largest submitted
+    /// bucket ID before collecting.
     fn collect_multiple(
         &mut self,
         bucket_ids: &[BucketId],
