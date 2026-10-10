@@ -442,7 +442,7 @@ mod tests {
     use std::collections::HashSet;
     use std::path::PathBuf;
 
-    use super::{IndexMeta, SegmentMetaInventory};
+    use super::{Bm25Params, IndexMeta, SegmentMetaInventory};
     use crate::index::index_meta::UntrackedIndexMeta;
     use crate::index::SegmentId;
     use crate::schema::{Schema, TEXT};
