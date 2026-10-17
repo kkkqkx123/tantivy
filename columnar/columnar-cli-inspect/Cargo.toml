@@ -5,9 +5,9 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-tantivy = {path="../..", package="tantivy"}
-columnar = {path="../", package="tantivy-columnar"}
-common = {path="../../common", package="tantivy-common"}
+tantivy = {path="../..", package="kkkqkx-tantivy"}
+columnar = {path="../", package="kkkqkx-tantivy-columnar"}
+common = {path="../../common", package="kkkqkx-tantivy-common"}
 
 [workspace]
 members = []

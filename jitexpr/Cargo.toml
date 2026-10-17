@@ -1,11 +1,16 @@
 [package]
-name = "jitexpr"
+name = "kkkqkx-jitexpr"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-homepage = "https://github.com/quickwit-oss/tantivy"
-repository = "https://github.com/quickwit-oss/tantivy"
+homepage = "https://github.com/kkkqkx123/tantivy"
+repository = "https://github.com/kkkqkx123/tantivy"
 description = "JIT-compiled expression evaluation for tantivy"
+
+[lib]
+# Keep the library name stable across the package rename so intra-crate
+# doctests and dependents' imports are unaffected.
+name = "jitexpr"
 
 [dependencies]
 cranelift = "0.134.3"

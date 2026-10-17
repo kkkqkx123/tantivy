@@ -1,15 +1,20 @@
 [package]
-name = "tantivy-stacker"
+name = "kkkqkx-tantivy-stacker"
 version = "0.7.0"
 edition = "2024"
 license = "MIT"
-homepage = "https://github.com/quickwit-oss/tantivy"
-repository = "https://github.com/quickwit-oss/tantivy"
+homepage = "https://github.com/kkkqkx123/tantivy"
+repository = "https://github.com/kkkqkx123/tantivy"
 description = "term hashmap used for indexing"
+
+[lib]
+# Keep the library name stable across the package rename so intra-crate
+# doctests and dependents' imports are unaffected.
+name = "tantivy_stacker"
 
 [dependencies]
 murmurhash32 = "0.4"
-common = { version = "0.11", path = "../common/", package = "tantivy-common" }
+common = { version = "0.11", path = "../common/", package = "kkkqkx-tantivy-common" }
 ahash = { version = "0.8.11", default-features = false, optional = true }
 
 

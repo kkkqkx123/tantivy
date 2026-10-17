@@ -1,13 +1,18 @@
 [package]
-name = "tantivy-tokenizer-api"
+name = "kkkqkx-tantivy-tokenizer-api"
 version = "0.7.0"
 license = "MIT"
 edition = "2021"
 description = "Tokenizer API of tantivy"
-homepage = "https://github.com/quickwit-oss/tantivy"
-repository = "https://github.com/quickwit-oss/tantivy"
+homepage = "https://github.com/kkkqkx123/tantivy"
+repository = "https://github.com/kkkqkx123/tantivy"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# Keep the library name stable across the package rename so intra-crate
+# doctests and dependents' imports are unaffected.
+name = "tantivy_tokenizer_api"
 
 [dependencies]
 serde = { version = "1.0.152", features = ["derive"] }

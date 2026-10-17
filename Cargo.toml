@@ -1,18 +1,23 @@
 [package]
-name = "tantivy"
+name = "kkkqkx-tantivy"
 version = "0.27.0"
 authors = ["Paul Masurel <paul.masurel@gmail.com>"]
 license = "MIT"
 categories = ["database-implementations", "data-structures"]
 description = """Search engine library"""
-documentation = "https://docs.rs/tantivy/"
-homepage = "https://github.com/quickwit-oss/tantivy"
-repository = "https://github.com/quickwit-oss/tantivy"
+documentation = "https://docs.rs/kkkqkx-tantivy/"
+homepage = "https://github.com/kkkqkx123/tantivy"
+repository = "https://github.com/kkkqkx123/tantivy"
 readme = "README.md"
 keywords = ["search", "information", "retrieval"]
 edition = "2021"
 rust-version = "1.88"
 exclude = ["benches/*.json", "benches/*.txt"]
+
+[lib]
+# Keep the library name `tantivy` so internal benches/tests and the
+# dependents' `use tantivy::` imports are unaffected by the package rename.
+name = "tantivy"
 
 [dependencies]
 oneshot = "0.1.13"
@@ -77,17 +82,17 @@ arc-swap = "1.5.0"
 bon = "3.3.1"
 
 # EXPERIMENTAL. The API is likely to change in the near future.
-jitexpr = { version = "0.1", path = "./jitexpr", optional = true }
+jitexpr = { version = "0.1", path = "./jitexpr", optional = true, package = "kkkqkx-jitexpr" }
 # Used by the jitexpr value source to intern the computed terms.
 hashbrown = { version = "0.17", default-features = false, optional = true }
 
-columnar = { version = "0.7", path = "./columnar", package = "tantivy-columnar" }
-sstable = { version = "0.7", path = "./sstable", package = "tantivy-sstable", optional = true }
-stacker = { version = "0.7", path = "./stacker", package = "tantivy-stacker" }
-query-grammar = { version = "0.26.0", path = "./query-grammar", package = "tantivy-query-grammar" }
-tantivy-bitpacker = { version = "0.10", path = "./bitpacker" }
-common = { version = "0.11", path = "./common/", package = "tantivy-common" }
-tokenizer-api = { version = "0.7", path = "./tokenizer-api", package = "tantivy-tokenizer-api" }
+columnar = { version = "0.7", path = "./columnar", package = "kkkqkx-tantivy-columnar" }
+sstable = { version = "0.7", path = "./sstable", package = "kkkqkx-tantivy-sstable", optional = true }
+stacker = { version = "0.7", path = "./stacker", package = "kkkqkx-tantivy-stacker" }
+query-grammar = { version = "0.26.0", path = "./query-grammar", package = "kkkqkx-tantivy-query-grammar" }
+tantivy-bitpacker = { version = "0.10", path = "./bitpacker", package = "kkkqkx-tantivy-bitpacker" }
+common = { version = "0.11", path = "./common/", package = "kkkqkx-tantivy-common" }
+tokenizer-api = { version = "0.7", path = "./tokenizer-api", package = "kkkqkx-tantivy-tokenizer-api" }
 sketches-ddsketch = { version = "0.4", features = ["use_serde"] }
 datasketches = { version = "0.5.0", features = ["hll"] }
 futures-util = { version = "0.3.28", optional = true }

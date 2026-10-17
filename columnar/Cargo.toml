@@ -1,21 +1,26 @@
 [package]
-name = "tantivy-columnar"
+name = "kkkqkx-tantivy-columnar"
 version = "0.7.0"
 edition = "2024"
 license = "MIT"
-homepage = "https://github.com/quickwit-oss/tantivy"
-repository = "https://github.com/quickwit-oss/tantivy"
+homepage = "https://github.com/kkkqkx123/tantivy"
+repository = "https://github.com/kkkqkx123/tantivy"
 description = "column oriented storage for tantivy"
 categories = ["database-implementations", "data-structures", "compression"]
+
+[lib]
+# Keep the library name stable across the package rename so intra-crate
+# doctests and dependents' imports are unaffected.
+name = "tantivy_columnar"
 
 [dependencies]
 itertools = "0.14.0"
 fastdivide = "0.4.0"
 
-stacker = { version= "0.7", path = "../stacker", package="tantivy-stacker"}
-sstable = { version= "0.7", path = "../sstable", package = "tantivy-sstable" }
-common = { version= "0.11", path = "../common", package = "tantivy-common" }
-tantivy-bitpacker = { version= "0.10", path = "../bitpacker/" }
+stacker = { version= "0.7", path = "../stacker", package="kkkqkx-tantivy-stacker"}
+sstable = { version= "0.7", path = "../sstable", package = "kkkqkx-tantivy-sstable" }
+common = { version= "0.11", path = "../common", package = "kkkqkx-tantivy-common" }
+tantivy-bitpacker = { version= "0.10", path = "../bitpacker/", package = "kkkqkx-tantivy-bitpacker" }
 serde = "1.0.152"
 downcast-rs = "2.0.1"
 rand = "0.9"
