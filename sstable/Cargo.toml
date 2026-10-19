@@ -1,6 +1,6 @@
 [package]
 name = "kkkqkx-tantivy-sstable"
-version = "0.7.0"
+version = "0.27.0"
 edition = "2024"
 license = "MIT"
 homepage = "https://github.com/kkkqkx123/tantivy"
@@ -15,10 +15,10 @@ description = "sstables for tantivy"
 name = "tantivy_sstable"
 
 [dependencies]
-common = {version= "0.11", path="../common", package="kkkqkx-tantivy-common"}
+common = {version= "0.27", path="../common", package="kkkqkx-tantivy-common"}
 futures-util = "0.3.30"
 itertools = "0.14.0"
-tantivy-bitpacker = { version= "0.10", path="../bitpacker", package = "kkkqkx-tantivy-bitpacker" }
+tantivy-bitpacker = { version= "0.27", path="../bitpacker", package = "kkkqkx-tantivy-bitpacker" }
 tantivy-fst = "0.5"
 # experimental gives us access to Decompressor::upper_bound
 zstd = { version = "0.14", optional = true, features = ["experimental"] }

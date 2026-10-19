@@ -1,6 +1,6 @@
 [package]
 name = "kkkqkx-tantivy-stacker"
-version = "0.7.0"
+version = "0.27.0"
 edition = "2024"
 license = "MIT"
 homepage = "https://github.com/kkkqkx123/tantivy"
@@ -14,7 +14,7 @@ name = "tantivy_stacker"
 
 [dependencies]
 murmurhash32 = "0.4"
-common = { version = "0.11", path = "../common/", package = "kkkqkx-tantivy-common" }
+common = { version = "0.27", path = "../common/", package = "kkkqkx-tantivy-common" }
 ahash = { version = "0.8.11", default-features = false, optional = true }
 
 
