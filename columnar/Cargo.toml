@@ -1,5 +1,5 @@
 [package]
-name = "kkkqkx-tantivy-columnar"
+name = "tantivy-columnar"
 version = "0.27.0"
 edition = "2024"
 license = "MIT"
@@ -17,10 +17,10 @@ name = "tantivy_columnar"
 itertools = "0.14.0"
 fastdivide = "0.4.0"
 
-stacker = { version= "0.27", path = "../stacker", package="kkkqkx-tantivy-stacker"}
-sstable = { version= "0.27", path = "../sstable", package = "kkkqkx-tantivy-sstable" }
-common = { version= "0.27", path = "../common", package = "kkkqkx-tantivy-common" }
-tantivy-bitpacker = { version= "0.27", path = "../bitpacker/", package = "kkkqkx-tantivy-bitpacker" }
+stacker = { version= "0.27", path = "../stacker", package="tantivy-stacker"}
+sstable = { version= "0.27", path = "../sstable", package = "tantivy-sstable" }
+common = { version= "0.27", path = "../common", package = "tantivy-common" }
+tantivy-bitpacker = { version= "0.27", path = "../bitpacker/", package = "tantivy-bitpacker" }
 serde = "1.0.152"
 downcast-rs = "2.0.1"
 rand = "0.9"

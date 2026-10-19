@@ -82,17 +82,17 @@ arc-swap = "1.5.0"
 bon = "3.3.1"
 
 # EXPERIMENTAL. The API is likely to change in the near future.
-jitexpr = { version = "0.1", path = "./jitexpr", optional = true, package = "kkkqkx-jitexpr" }
+jitexpr = { version = "0.1", optional = true }
 # Used by the jitexpr value source to intern the computed terms.
 hashbrown = { version = "0.17", default-features = false, optional = true }
 
-columnar = { version = "0.27", path = "./columnar", package = "kkkqkx-tantivy-columnar" }
-sstable = { version = "0.27", path = "./sstable", package = "kkkqkx-tantivy-sstable", optional = true }
-stacker = { version = "0.27", path = "./stacker", package = "kkkqkx-tantivy-stacker" }
-query-grammar = { version = "0.27", path = "./query-grammar", package = "kkkqkx-tantivy-query-grammar" }
-tantivy-bitpacker = { version = "0.27", path = "./bitpacker", package = "kkkqkx-tantivy-bitpacker" }
-common = { version = "0.27", path = "./common/", package = "kkkqkx-tantivy-common" }
-tokenizer-api = { version = "0.7", path = "./tokenizer-api", package = "kkkqkx-tantivy-tokenizer-api" }
+columnar = { version = "0.27", package = "tantivy-columnar" }
+sstable = { version = "0.27", package = "tantivy-sstable", optional = true }
+stacker = { version = "0.27", package = "tantivy-stacker" }
+query-grammar = { version = "0.27", package = "tantivy-query-grammar" }
+tantivy-bitpacker = "0.27"
+common = { version = "0.27", package = "tantivy-common" }
+tokenizer-api = { version = "0.7", package = "tantivy-tokenizer-api" }
 sketches-ddsketch = { version = "0.4", features = ["use_serde"] }
 datasketches = { version = "0.5.0", features = ["hll"] }
 futures-util = { version = "0.3.28", optional = true }

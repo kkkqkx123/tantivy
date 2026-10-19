@@ -1,5 +1,5 @@
 [package]
-name = "kkkqkx-tantivy-bitpacker"
+name = "tantivy-bitpacker"
 version = "0.27.0"
 edition = "2024"
 authors = ["Paul Masurel <paul.masurel@gmail.com>"]
@@ -8,7 +8,7 @@ categories = []
 description = """Tantivy-sub crate: bitpacking"""
 repository = "https://github.com/kkkqkx123/tantivy"
 keywords = []
-documentation = "https://docs.rs/kkkqkx-tantivy-bitpacker/latest/tantivy_bitpacker"
+documentation = "https://docs.rs/tantivy-bitpacker/latest/tantivy_bitpacker"
 homepage = "https://github.com/kkkqkx123/tantivy"
 
 

@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-columnar = {path="../", package="kkkqkx-tantivy-columnar"}
+columnar = {path="../", package="tantivy-columnar"}
 serde_json = "1"
 serde_json_borrow = {git="https://github.com/PSeitz/serde_json_borrow/"}
 

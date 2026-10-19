@@ -1,5 +1,5 @@
 [package]
-name = "kkkqkx-tantivy-tokenizer-api"
+name = "tantivy-tokenizer-api"
 version = "0.7.0"
 license = "MIT"
 edition = "2021"
